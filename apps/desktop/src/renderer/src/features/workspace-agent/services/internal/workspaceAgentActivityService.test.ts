@@ -4585,3 +4585,119 @@ test("WorkspaceAgentActivityService constructs the recorder at start and drops i
   assert.equal(appended.length, 1);
   service.dispose();
 });
+
+test("WorkspaceAgentActivityService.activateSession resolves cwd from the daemon root in remote mode", async () => {
+  let createUserDocumentsCalls = 0;
+  let listDirectoryCalls = 0;
+  let createdCwd: string | null | undefined;
+  const service = new WorkspaceAgentActivityService({
+    tuttidClient: {
+      listWorkspaceFileDirectory: async () => {
+        listDirectoryCalls += 1;
+        return { root: "/home/remote-user", entries: [] };
+      },
+      createWorkspaceAgentSession: async (
+        _workspaceId: string,
+        request: Parameters<TuttidClient["createWorkspaceAgentSession"]>[1]
+      ) => {
+        createdCwd = request.cwd;
+        return workspaceAgentSession({ status: "created" });
+      }
+    } as unknown as TuttidClient,
+    hostFilesApi: {
+      createUserDocumentsProjectDirectory: async () => {
+        createUserDocumentsCalls += 1;
+        return { path: "/Users/local/Documents/tutti/session-x" };
+      }
+    } as never,
+    runtimeApi: {
+      logTerminalDiagnostic: async () => {},
+      getBackendConfig: async () => ({
+        accessToken: "t",
+        baseUrl: "https://remote.example",
+        remoteDaemon: true
+      })
+    }
+  });
+
+  await service.activateSession({
+    activationId: "submit-remote",
+    agentSessionId: "22222222-2222-4222-8222-222222222222",
+    agentTargetId: "local:codex",
+    clientSubmitId: "submit-remote",
+    cwd: undefined,
+    initialContent: [{ type: "text", text: "hi" }],
+    mode: "new",
+    settings: {
+      browserUse: false,
+      model: "gpt-5",
+      permissionModeId: "auto",
+      planMode: false,
+      reasoningEffort: "high",
+      speed: "fast"
+    },
+    title: "Remote",
+    visible: true,
+    workspaceId: "ws-1"
+  });
+
+  assert.equal(createUserDocumentsCalls, 0);
+  assert.equal(listDirectoryCalls, 1);
+  assert.equal(createdCwd, "/home/remote-user");
+  service.dispose();
+});
+
+test("WorkspaceAgentActivityService.activateSession creates a local documents dir when not remote", async () => {
+  let createUserDocumentsCalls = 0;
+  let createdCwd: string | null | undefined;
+  const service = new WorkspaceAgentActivityService({
+    tuttidClient: {
+      createWorkspaceAgentSession: async (
+        _workspaceId: string,
+        request: Parameters<TuttidClient["createWorkspaceAgentSession"]>[1]
+      ) => {
+        createdCwd = request.cwd;
+        return workspaceAgentSession({ status: "created" });
+      }
+    } as unknown as TuttidClient,
+    hostFilesApi: {
+      createUserDocumentsProjectDirectory: async () => {
+        createUserDocumentsCalls += 1;
+        return { path: "/Users/local/Documents/tutti/session-x" };
+      }
+    } as never,
+    runtimeApi: {
+      logTerminalDiagnostic: async () => {},
+      getBackendConfig: async () => ({
+        accessToken: "t",
+        baseUrl: "http://127.0.0.1:4545",
+        remoteDaemon: false
+      })
+    }
+  });
+
+  await service.activateSession({
+    activationId: "submit-local",
+    agentSessionId: "33333333-3333-4333-8333-333333333333",
+    agentTargetId: "local:codex",
+    clientSubmitId: "submit-local",
+    cwd: undefined,
+    initialContent: [{ type: "text", text: "hi" }],
+    mode: "new",
+    settings: {
+      browserUse: false,
+      model: "gpt-5",
+      permissionModeId: "auto",
+      planMode: false,
+      reasoningEffort: "high",
+      speed: "fast"
+    },
+    title: "Local",
+    visible: true,
+    workspaceId: "ws-1"
+  });
+
+  assert.equal(createUserDocumentsCalls, 1);
+  assert.equal(createdCwd, "/Users/local/Documents/tutti/session-x");
+  service.dispose();
+});

@@ -16,6 +16,7 @@ import {
   type DesktopDaemonEndpoint
 } from "../transport/paths";
 import { listDesktopWorkspaceAgentProbes } from "../agentProviderUsageProbe";
+import { isRemoteDaemonModeEnabled } from "../transport/remoteMode.ts";
 import type { DesktopFileDialogAccess } from "../host/desktopFileDialogAccess.ts";
 import type { DesktopHostPreferencesState } from "../desktopHostPreferences.ts";
 import {
@@ -101,7 +102,8 @@ function resolveBackendConfig(
 ): DesktopBackendConfig {
   return {
     accessToken: endpoint.accessToken,
-    baseUrl: resolveDesktopDaemonBaseUrl(endpoint)
+    baseUrl: resolveDesktopDaemonBaseUrl(endpoint),
+    remoteDaemon: isRemoteDaemonModeEnabled()
   };
 }
 

@@ -618,6 +618,14 @@ export interface DesktopWorkspaceAppOpenFileResolvedPayload {
 export interface DesktopBackendConfig {
   accessToken: string;
   baseUrl: string;
+  /**
+   * True when the desktop is connected to a tuttid running on another machine
+   * (TUTTID_REMOTE_URL). In this mode the client must not resolve host-local
+   * paths (e.g. a session working directory) and send them to the daemon, since
+   * they do not exist on the daemon's machine. Optional/defaults to false so
+   * existing fixtures and the local-daemon path need no change.
+   */
+  remoteDaemon?: boolean;
 }
 
 export interface DesktopLaunchAgentSessionReplayCassette {

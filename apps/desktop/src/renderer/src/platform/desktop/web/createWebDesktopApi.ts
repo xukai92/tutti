@@ -456,7 +456,10 @@ function resolveWebBackendConfig(): DesktopBackendConfig {
   const accessToken = readRequiredEnv("VITE_TUTTID_ACCESS_TOKEN");
   return {
     accessToken,
-    baseUrl
+    baseUrl,
+    // The web-dev runtime always talks to a separate daemon and has no local
+    // filesystem, so it behaves like remote mode: never resolve host-local cwds.
+    remoteDaemon: true
   };
 }
 

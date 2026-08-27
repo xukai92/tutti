@@ -77,7 +77,7 @@ export function normalizeRemoteBaseUrl(rawUrl: string): string | null {
   // coercing it to https. A value with no "scheme://" prefix defaults to https.
   const explicitScheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(trimmed);
   if (explicitScheme) {
-    const scheme = explicitScheme[1].toLowerCase();
+    const scheme = explicitScheme[1]?.toLowerCase();
     if (scheme !== "http" && scheme !== "https") {
       return null;
     }

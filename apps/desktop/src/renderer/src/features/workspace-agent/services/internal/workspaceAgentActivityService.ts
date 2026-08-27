@@ -92,7 +92,8 @@ export interface WorkspaceAgentActivityServiceDependencies {
   tuttidClient: TuttidClient;
   reporterNow?: () => number;
   reporterService?: Pick<IReporterService, "trackEvents">;
-  runtimeApi: Pick<DesktopRuntimeApi, "logTerminalDiagnostic">;
+  runtimeApi: Pick<DesktopRuntimeApi, "logTerminalDiagnostic"> &
+    Partial<Pick<DesktopRuntimeApi, "getBackendConfig">>;
   forceRefreshAgentProviderStatuses?: (
     providers: WorkspaceAgentProvider[]
   ) => Promise<AgentProviderStatusListResponse | null>;
@@ -1016,6 +1017,25 @@ export class WorkspaceAgentActivityService
     return this.mutationOperations.unactivateSession(input);
   }
 
+  private remoteDaemonPromise: Promise<boolean> | null = null;
+
+  // isRemoteDaemon reports whether the desktop is connected to a tuttid on
+  // another machine. Memoized: the backend config is fixed for the lifetime of
+  // the process, and a stale/failed lookup should not silently fall back to
+  // host-local path resolution on every activation.
+  private isRemoteDaemon(): Promise<boolean> {
+    if (!this.remoteDaemonPromise) {
+      const getBackendConfig = this.dependencies.runtimeApi.getBackendConfig;
+      this.remoteDaemonPromise = getBackendConfig
+        ? Promise.resolve()
+            .then(() => getBackendConfig())
+            .then((config) => config.remoteDaemon === true)
+            .catch(() => false)
+        : Promise.resolve(false);
+    }
+    return this.remoteDaemonPromise;
+  }
+
   private async resolveWorkspaceAgentCwd(input: {
     agentSessionId: string;
     cwd: string | null | undefined;
@@ -1023,6 +1043,20 @@ export class WorkspaceAgentActivityService
   }): Promise<{ cwd: string | null; noProject: boolean }> {
     const trimmed = input.cwd?.trim() ?? "";
     if (!trimmed) {
+      // In remote mode the daemon runs on another machine, so a host-local
+      // Documents directory would not exist there (the daemon rejects it with
+      // invalid_path). Let the daemon resolve its own workspace root instead.
+      if (await this.isRemoteDaemon()) {
+        const response =
+          await this.dependencies.tuttidClient.listWorkspaceFileDirectory(
+            input.workspaceId,
+            {}
+          );
+        this.dependencies.workspaceUserProjectService?.rememberNoProjectPath(
+          response.root
+        );
+        return { cwd: response.root, noProject: true };
+      }
       const directory =
         await this.dependencies.hostFilesApi?.createUserDocumentsProjectDirectory(
           {
