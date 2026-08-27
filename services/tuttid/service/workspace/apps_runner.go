@@ -841,11 +841,17 @@ func appRuntimePathWithBinDirs(appRuntime ResolvedAppRuntime, prefixDirs ...stri
 	return pathKey + "=" + strings.Join(pathDirs, string(os.PathListSeparator))
 }
 
-func tuttiCLIShimPathForPlatform(platform string) string {
-	commandName := "tutti"
+// tuttiCLICommandName is the base name of the tutti CLI the daemon expects apps
+// to invoke (tutti-dev in development), without any platform-specific suffix.
+func tuttiCLICommandName() string {
 	if tuttitypes.IsDevelopmentEnv() {
-		commandName = "tutti-dev"
+		return "tutti-dev"
 	}
+	return "tutti"
+}
+
+func tuttiCLIShimPathForPlatform(platform string) string {
+	commandName := tuttiCLICommandName()
 	if platform == "windows" {
 		commandName += ".cmd"
 	}

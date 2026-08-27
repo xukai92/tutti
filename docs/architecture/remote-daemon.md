@@ -105,6 +105,20 @@ webview. The daemon reverse-proxies those requests to the app's loopback port
 
 No per-app port forwarding is needed.
 
+### The `tutti` CLI must be on the daemon's PATH
+
+Apps shell out to the `tutti` CLI for some operations (e.g. listing agents via
+`/api/local-agent/targets` → `tutti agent list`). A normal desktop install writes
+a shim at `<stateDir>/bin/tutti`; a headless remote-only daemon never does, so
+apps would fail with `cli_execution_failed` (ENOENT).
+
+The daemon now resolves the app CLI in order: `TUTTI_WORKSPACE_APP_CLI_PATH`
+override → the `<stateDir>/bin/tutti` shim → a `tutti` found on the daemon
+process's PATH. So on the remote machine, ensure `tutti` is installed and on the
+daemon's PATH (or point `TUTTI_WORKSPACE_APP_CLI_PATH` at it). The CLI reaches
+the daemon over loopback via the listener-info file, so no extra config is
+needed beyond it being discoverable.
+
 ## Caveats
 
 - **Everything is remote.** Files, terminals, and agent working directories live

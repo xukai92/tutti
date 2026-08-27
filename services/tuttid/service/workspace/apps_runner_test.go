@@ -51,6 +51,16 @@ exec "$TUTTI_APP_PYTHON" "$TUTTI_APP_PACKAGE_DIR/server.py"
 	t.Setenv("TUTTI_STATE_DIR", stateRoot)
 	t.Setenv("TUTTI_WORKSPACE_ROOT", "/inherited/workspace")
 	t.Setenv(removedWorkspaceRootCompatibilityEnvKey, "/inherited/workspace")
+	// Create the desktop-style CLI shim so the app CLI resolves to it
+	// deterministically (rather than falling back to a tutti found on the test
+	// host's PATH).
+	shimPath := filepath.Join(stateRoot, "bin", "tutti")
+	if err := os.MkdirAll(filepath.Dir(shimPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(shimPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
 	runner := &AppRunner{HealthcheckTimeout: 10 * time.Second}
 	state, err := runner.Start(context.Background(), AppStartInput{
 		WorkspaceID:     "ws-runner",
@@ -1162,6 +1172,68 @@ func TestTuttiCLIShimPathUsesDevelopmentCommand(t *testing.T) {
 	want := filepath.Join(stateDir, "bin", "tutti-dev")
 	if got := tuttiCLIShimPathForPlatform("darwin"); got != want {
 		t.Fatalf("tuttiCLIShimPathForPlatform() = %q, want %q", got, want)
+	}
+}
+
+func TestWorkspaceAppCLIPathUnixPrefersExplicitOverride(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("TUTTI_STATE_DIR", stateDir)
+	t.Setenv("TUTTI_ENV", "production")
+	t.Setenv("TUTTI_WORKSPACE_APP_CLI_PATH", "/custom/tutti")
+
+	if got := resolveWorkspaceAppCLIPathUnix("linux"); got != "/custom/tutti" {
+		t.Fatalf("resolveWorkspaceAppCLIPathUnix() = %q, want /custom/tutti", got)
+	}
+}
+
+func TestWorkspaceAppCLIPathUnixUsesShimWhenPresent(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("TUTTI_STATE_DIR", stateDir)
+	t.Setenv("TUTTI_ENV", "production")
+	t.Setenv("TUTTI_WORKSPACE_APP_CLI_PATH", "")
+
+	shim := filepath.Join(stateDir, "bin", "tutti")
+	if err := os.MkdirAll(filepath.Dir(shim), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(shim, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if got := resolveWorkspaceAppCLIPathUnix("linux"); got != shim {
+		t.Fatalf("resolveWorkspaceAppCLIPathUnix() = %q, want %q", got, shim)
+	}
+}
+
+func TestWorkspaceAppCLIPathUnixFallsBackToPath(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("TUTTI_STATE_DIR", stateDir)
+	t.Setenv("TUTTI_ENV", "production")
+	t.Setenv("TUTTI_WORKSPACE_APP_CLI_PATH", "")
+
+	// No shim at <stateDir>/bin/tutti; place a `tutti` on PATH instead.
+	binDir := t.TempDir()
+	onPath := filepath.Join(binDir, "tutti")
+	if err := os.WriteFile(onPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	t.Setenv("PATH", binDir)
+
+	if got := resolveWorkspaceAppCLIPathUnix("linux"); got != onPath {
+		t.Fatalf("resolveWorkspaceAppCLIPathUnix() = %q, want %q", got, onPath)
+	}
+}
+
+func TestWorkspaceAppCLIPathUnixFallsBackToShimPathWhenNothingFound(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("TUTTI_STATE_DIR", stateDir)
+	t.Setenv("TUTTI_ENV", "production")
+	t.Setenv("TUTTI_WORKSPACE_APP_CLI_PATH", "")
+	t.Setenv("PATH", t.TempDir()) // empty dir: no tutti on PATH
+
+	want := filepath.Join(stateDir, "bin", "tutti")
+	if got := resolveWorkspaceAppCLIPathUnix("linux"); got != want {
+		t.Fatalf("resolveWorkspaceAppCLIPathUnix() = %q, want %q", got, want)
 	}
 }
 
