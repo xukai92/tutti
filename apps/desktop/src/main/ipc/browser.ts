@@ -65,19 +65,6 @@ type BrowserInvokeChannel = Exclude<
 const prefersColorSchemeFeatureName = "prefers-color-scheme";
 const maximumCookieImportBytes = 10 * 1024 * 1024;
 
-function readRefererHeader(
-  headers: Record<string, string | string[]>
-): string | undefined {
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() !== "referer") {
-      continue;
-    }
-    const header = Array.isArray(value) ? value[0] : value;
-    return typeof header === "string" ? header : undefined;
-  }
-  return undefined;
-}
-
 function getPreferredColorScheme(
   preferences: DesktopHostPreferencesState
 ): BrowserPreferredColorScheme {
@@ -102,10 +89,7 @@ export async function registerBrowserIpc(
      * daemon guards with bearer auth) instead of a direct loopback URL. Returns
      * the header value for a matching request URL, or null to leave it alone.
      */
-    resolveDaemonProxyAuthHeader?: (
-      requestUrl: string,
-      refererUrl?: string
-    ) => string | null;
+    resolveDaemonProxyAuthHeader?: (requestUrl: string) => string | null;
   }
 ): Promise<{ dispose(): void }> {
   const logger = getDesktopLogger();
@@ -238,11 +222,7 @@ export async function registerBrowserIpc(
       ) {
         preparedProxyAuthSessions.add(browserSession);
         browserSession.webRequest.onBeforeSendHeaders((details, callback) => {
-          const refererHeader = readRefererHeader(details.requestHeaders);
-          const authHeader = resolveDaemonProxyAuthHeader(
-            details.url,
-            refererHeader
-          );
+          const authHeader = resolveDaemonProxyAuthHeader(details.url);
           if (authHeader) {
             callback({
               requestHeaders: {

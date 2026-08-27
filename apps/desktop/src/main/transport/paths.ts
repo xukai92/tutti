@@ -46,25 +46,25 @@ export function resolveDesktopDaemonEndpoint(): DesktopDaemonEndpoint {
   };
 }
 
-const appProxyPathPattern = /\/v1\/workspaces\/[^/]+\/apps\/[^/]+\/proxy(\/|$)/;
-
 /**
  * Returns the `Authorization` header value to attach to a workspace-app webview
  * request destined for the daemon, so the daemon's bearer auth is satisfied.
  *
- * A request qualifies when it targets the daemon origin AND either:
- *  - its own path is an app-proxy path (the initial document load), or
- *  - its Referer is an app-proxy page (root-absolute asset/API requests the app
- *    makes, e.g. "/assets/x.js" or a runtime fetch("/api/..."), which the daemon
- *    routes back to the app by Referer).
+ * This is installed only on a dedicated app webview session partition
+ * (persist:tutti-app:<ws>:<app>), which carries a single app's traffic. So any
+ * request from it to the daemon origin belongs to that app's proxied surface —
+ * the initial document, its assets, its /api/* XHRs, and its WebSocket handshake
+ * — and all of them must carry the daemon token. Attaching to every
+ * daemon-origin request (rather than sniffing the path or Referer) is what makes
+ * this robust: browsers omit or truncate Referer for many sub-resource and WS
+ * requests, which previously caused intermittent 401s on CSS/XHR/WS.
  *
- * Returns null for anything else so unrelated traffic is untouched. Safe to call
- * before the endpoint is bound (returns null).
+ * Requests to any other origin (the app's own externally-hosted resources, CDNs)
+ * are left untouched. Returns null before the endpoint is bound.
  */
 export function resolveDaemonAppProxyAuthHeader(
   endpoint: DesktopDaemonEndpoint,
-  requestUrl: string,
-  refererUrl?: string
+  requestUrl: string
 ): string | null {
   if (!endpoint.boundAddr || !endpoint.accessToken) {
     return null;
@@ -80,31 +80,7 @@ export function resolveDaemonAppProxyAuthHeader(
   if (target.origin !== base.origin) {
     return null;
   }
-  const targetIsProxyPath = appProxyPathPattern.test(target.pathname);
-  const refererIsProxyPage = isAppProxyReferer(refererUrl, base.origin);
-  if (!targetIsProxyPath && !refererIsProxyPage) {
-    return null;
-  }
   return `Bearer ${endpoint.accessToken}`;
-}
-
-function isAppProxyReferer(
-  refererUrl: string | undefined,
-  daemonOrigin: string
-): boolean {
-  const trimmed = refererUrl?.trim() ?? "";
-  if (trimmed === "") {
-    return false;
-  }
-  try {
-    const referer = new URL(trimmed);
-    return (
-      referer.origin === daemonOrigin &&
-      appProxyPathPattern.test(referer.pathname)
-    );
-  } catch {
-    return false;
-  }
 }
 
 export function resolveDesktopDaemonBaseUrl(
