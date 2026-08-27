@@ -27,6 +27,7 @@ type coverageStubRoutes struct {
 }
 
 func (coverageStubRoutes) AttachEventStreamWebSocket(http.ResponseWriter, *http.Request)       {}
+func (coverageStubRoutes) ProxyWorkspaceApp(http.ResponseWriter, *http.Request)                {}
 func (coverageStubRoutes) AttachWorkspaceTerminalWebSocket(http.ResponseWriter, *http.Request) {}
 func (coverageStubRoutes) HandleManagedModelGrant(http.ResponseWriter, *http.Request, string, string, string) {
 }

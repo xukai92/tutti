@@ -270,7 +270,7 @@ func (api DaemonAPI) PublishWorkspaceAppFactoryJob(ctx context.Context, request 
 	return tuttigenerated.PublishWorkspaceAppFactoryJob200JSONResponse{
 		WorkspaceId: workspaceID,
 		Job:         generatedAppFactoryJob(job),
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 

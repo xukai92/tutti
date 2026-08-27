@@ -21,6 +21,7 @@ type Routes interface {
 	HandleManagedModelProviderModels(http.ResponseWriter, *http.Request, string, string)
 	HandleManagedModelProviderTest(http.ResponseWriter, *http.Request, string, string)
 	HandleManagedModelProviders(http.ResponseWriter, *http.Request, string)
+	ProxyWorkspaceApp(http.ResponseWriter, *http.Request)
 }
 
 func RegisterRoutes(mux *http.ServeMux, routes Routes) {
@@ -508,6 +509,18 @@ func RegisterRoutes(mux *http.ServeMux, routes Routes) {
 	mux.HandleFunc("/v1/workspaces/{workspaceID}/apps/{appID}/managed-model-grants/{grantRef}", func(w http.ResponseWriter, r *http.Request) {
 		routes.HandleManagedModelGrant(w, r, r.PathValue("workspaceID"), r.PathValue("appID"), r.PathValue("grantRef"))
 	})
+
+	// Reverse-proxy to a running app's loopback server. Registered before the
+	// generated app routes so the {rest...} subtree does not shadow them; the
+	// "/proxy/" literal segment keeps it disjoint from the other app routes.
+	mux.HandleFunc(
+		"/v1/workspaces/{workspaceID}/apps/{appID}/"+AppProxyPathSegment+"/{rest...}",
+		routes.ProxyWorkspaceApp,
+	)
+	mux.HandleFunc(
+		"/v1/workspaces/{workspaceID}/apps/{appID}/"+AppProxyPathSegment,
+		routes.ProxyWorkspaceApp,
+	)
 
 	registerWorkspaceAppRoutes(mux, wrapper)
 

@@ -8,7 +8,10 @@ import { registerUpdateIpc } from "./update";
 import { registerWallpaperIpc } from "./wallpaper";
 import { registerWorkspaceAppContextIpc } from "./workspaceAppContext";
 import type { AppUpdateService } from "../update/appUpdateService";
-import type { DesktopDaemonEndpoint } from "../transport/paths";
+import {
+  resolveDaemonAppProxyAuthHeader,
+  type DesktopDaemonEndpoint
+} from "../transport/paths";
 import { registerBrowserIpc } from "./browser";
 import { registerComputerUseIpc } from "./computerUse";
 import { registerDockPreviewCacheIpc } from "./dockPreviewCache";
@@ -75,7 +78,9 @@ export async function registerIpcHandlers(
         workspaceID: workspaceId
       }),
     ensureUserBrowserHost: ({ workspaceId }) =>
-      deps.workspaceLaunch.ensureUserBrowserHost(workspaceId)
+      deps.workspaceLaunch.ensureUserBrowserHost(workspaceId),
+    resolveDaemonProxyAuthHeader: (requestUrl) =>
+      resolveDaemonAppProxyAuthHeader(deps.daemonEndpoint, requestUrl)
   });
   registerComputerUseIpc();
   registerDockPreviewCacheIpc();

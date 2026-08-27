@@ -46,6 +46,39 @@ export function resolveDesktopDaemonEndpoint(): DesktopDaemonEndpoint {
   };
 }
 
+/**
+ * Returns the `Authorization` header value to attach to a workspace-app webview
+ * request when (and only when) it targets the daemon's app reverse-proxy
+ * endpoint, so the daemon's bearer auth is satisfied. Returns null for any other
+ * request (app's own assets, cross-origin calls) so unrelated traffic is
+ * untouched. Safe to call before the endpoint is bound (returns null).
+ */
+export function resolveDaemonAppProxyAuthHeader(
+  endpoint: DesktopDaemonEndpoint,
+  requestUrl: string
+): string | null {
+  if (!endpoint.boundAddr || !endpoint.accessToken) {
+    return null;
+  }
+  let base: URL;
+  let target: URL;
+  try {
+    base = new URL(resolveDesktopDaemonBaseUrl(endpoint));
+    target = new URL(requestUrl);
+  } catch {
+    return null;
+  }
+  if (target.origin !== base.origin) {
+    return null;
+  }
+  if (
+    !/\/v1\/workspaces\/[^/]+\/apps\/[^/]+\/proxy(\/|$)/.test(target.pathname)
+  ) {
+    return null;
+  }
+  return `Bearer ${endpoint.accessToken}`;
+}
+
 export function resolveDesktopDaemonBaseUrl(
   endpoint: DesktopDaemonEndpoint
 ): string {

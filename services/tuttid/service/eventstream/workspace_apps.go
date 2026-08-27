@@ -52,7 +52,7 @@ func (p WorkspaceAppPublisher) PublishWorkspaceAppUpdated(ctx context.Context, w
 			Enabled:          app.Installation != nil && app.Installation.Enabled,
 			Status:           string(app.Runtime.Status),
 			StateRevision:    app.StateRevision,
-			LaunchUrl:        app.Runtime.LaunchURL,
+			LaunchUrl:        workspacebiz.ExternalLaunchURL(workspaceID, app.Package.AppID, app.Runtime.LaunchURL),
 			Port:             app.Runtime.Port,
 			FailurePhase:     workspaceAppFailurePhaseString(app.Runtime.FailurePhase),
 			FailureReason:    app.Runtime.FailureReason,

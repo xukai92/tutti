@@ -45,7 +45,7 @@ func (api DaemonAPI) ListWorkspaceApps(ctx context.Context, request tuttigenerat
 	return tuttigenerated.ListWorkspaceApps200JSONResponse{
 		WorkspaceId:   workspaceID,
 		CatalogStatus: workspaceapi.GeneratedAppCatalogLoadStateFromBiz(api.AppCenterService.CatalogLoadState()),
-		Apps:          workspaceapi.GeneratedAppsFromBiz(apps),
+		Apps:          workspaceapi.GeneratedAppsFromBiz(workspaceID, apps),
 	}, nil
 }
 
@@ -76,7 +76,7 @@ func (api DaemonAPI) RefreshWorkspaceAppCatalog(ctx context.Context, request tut
 	return tuttigenerated.RefreshWorkspaceAppCatalog200JSONResponse{
 		WorkspaceId:   workspaceID,
 		CatalogStatus: workspaceapi.GeneratedAppCatalogLoadStateFromBiz(api.AppCenterService.CatalogLoadState()),
-		Apps:          workspaceapi.GeneratedAppsFromBiz(apps),
+		Apps:          workspaceapi.GeneratedAppsFromBiz(workspaceID, apps),
 	}, nil
 }
 
@@ -103,7 +103,7 @@ func (api DaemonAPI) InstallWorkspaceApp(ctx context.Context, request tuttigener
 
 	return tuttigenerated.InstallWorkspaceApp200JSONResponse{
 		WorkspaceId: workspaceID,
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 
@@ -144,7 +144,7 @@ func (api DaemonAPI) ImportWorkspaceApp(ctx context.Context, request tuttigenera
 	}
 	return tuttigenerated.ImportWorkspaceApp200JSONResponse{
 		WorkspaceId: workspaceID,
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 
@@ -182,7 +182,7 @@ func (api DaemonAPI) LoadLocalWorkspaceApp(ctx context.Context, request tuttigen
 	}
 	return tuttigenerated.LoadLocalWorkspaceApp200JSONResponse{
 		WorkspaceId: workspaceID,
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 
@@ -208,7 +208,7 @@ func (api DaemonAPI) ReloadLocalWorkspaceApp(ctx context.Context, request tuttig
 	}
 	return tuttigenerated.ReloadLocalWorkspaceApp200JSONResponse{
 		WorkspaceId: workspaceID,
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 
@@ -281,7 +281,7 @@ func (api DaemonAPI) ReplaceWorkspaceAppIcon(ctx context.Context, request tuttig
 	}
 	return tuttigenerated.ReplaceWorkspaceAppIcon200JSONResponse{
 		WorkspaceId: workspaceID,
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 
@@ -304,7 +304,7 @@ func (api DaemonAPI) UninstallWorkspaceApp(ctx context.Context, request tuttigen
 
 	return tuttigenerated.UninstallWorkspaceApp200JSONResponse{
 		WorkspaceId: workspaceID,
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 
@@ -350,7 +350,7 @@ func (api DaemonAPI) LaunchWorkspaceApp(ctx context.Context, request tuttigenera
 
 	return tuttigenerated.LaunchWorkspaceApp200JSONResponse{
 		WorkspaceId: workspaceID,
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 
@@ -373,7 +373,7 @@ func (api DaemonAPI) RetryWorkspaceApp(ctx context.Context, request tuttigenerat
 
 	return tuttigenerated.RetryWorkspaceApp200JSONResponse{
 		WorkspaceId: workspaceID,
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 
@@ -404,7 +404,7 @@ func (api DaemonAPI) RollbackWorkspaceApp(ctx context.Context, request tuttigene
 	}
 	return tuttigenerated.RollbackWorkspaceApp200JSONResponse{
 		WorkspaceId: workspaceID,
-		App:         workspaceapi.GeneratedAppFromBiz(app),
+		App:         workspaceapi.GeneratedAppFromBiz(workspaceID, app),
 	}, nil
 }
 
@@ -435,7 +435,7 @@ func (api DaemonAPI) StartEnabledWorkspaceApps(ctx context.Context, request tutt
 	return tuttigenerated.StartEnabledWorkspaceApps200JSONResponse{
 		WorkspaceId:   workspaceID,
 		CatalogStatus: workspaceapi.GeneratedAppCatalogLoadStateFromBiz(api.AppCenterService.CatalogLoadState()),
-		Apps:          workspaceapi.GeneratedAppsFromBiz(apps),
+		Apps:          workspaceapi.GeneratedAppsFromBiz(workspaceID, apps),
 	}, nil
 }
 
@@ -466,7 +466,7 @@ func (api DaemonAPI) StopAllWorkspaceApps(ctx context.Context, request tuttigene
 	return tuttigenerated.StopAllWorkspaceApps200JSONResponse{
 		WorkspaceId:   workspaceID,
 		CatalogStatus: workspaceapi.GeneratedAppCatalogLoadStateFromBiz(api.AppCenterService.CatalogLoadState()),
-		Apps:          workspaceapi.GeneratedAppsFromBiz(apps),
+		Apps:          workspaceapi.GeneratedAppsFromBiz(workspaceID, apps),
 	}, nil
 }
 

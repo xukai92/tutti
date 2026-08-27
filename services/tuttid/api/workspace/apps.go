@@ -7,7 +7,7 @@ import (
 	workspacebiz "github.com/tutti-os/tutti/services/tuttid/biz/workspace"
 )
 
-func GeneratedAppFromBiz(app workspacebiz.WorkspaceApp) tuttigenerated.WorkspaceApp {
+func GeneratedAppFromBiz(workspaceID string, app workspacebiz.WorkspaceApp) tuttigenerated.WorkspaceApp {
 	return tuttigenerated.WorkspaceApp{
 		AppId:            app.Package.AppID,
 		DisplayName:      app.Package.DisplayName(),
@@ -24,7 +24,7 @@ func GeneratedAppFromBiz(app workspacebiz.WorkspaceApp) tuttigenerated.Workspace
 		Enabled:          app.Installation != nil && app.Installation.Enabled,
 		Status:           generatedAppRuntimeStatus(app.Runtime.Status),
 		StateRevision:    app.StateRevision,
-		LaunchUrl:        app.Runtime.LaunchURL,
+		LaunchUrl:        workspacebiz.ExternalLaunchURL(workspaceID, app.Package.AppID, app.Runtime.LaunchURL),
 		Port:             app.Runtime.Port,
 		FailurePhase:     generatedAppFailurePhase(app.Runtime.FailurePhase),
 		FailureReason:    app.Runtime.FailureReason,
@@ -112,10 +112,10 @@ func generatedAppInstallUserPhase(phase workspacebiz.AppInstallUserPhase) tuttig
 	}
 }
 
-func GeneratedAppsFromBiz(apps []workspacebiz.WorkspaceApp) []tuttigenerated.WorkspaceApp {
+func GeneratedAppsFromBiz(workspaceID string, apps []workspacebiz.WorkspaceApp) []tuttigenerated.WorkspaceApp {
 	result := make([]tuttigenerated.WorkspaceApp, 0, len(apps))
 	for _, app := range apps {
-		result = append(result, GeneratedAppFromBiz(app))
+		result = append(result, GeneratedAppFromBiz(workspaceID, app))
 	}
 	return result
 }

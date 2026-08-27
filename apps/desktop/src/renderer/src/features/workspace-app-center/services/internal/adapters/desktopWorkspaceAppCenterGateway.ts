@@ -8,6 +8,7 @@ import type {
   WorkspaceAppListResponse,
   WorkspaceAppRuntimeStatus
 } from "@tutti-os/client-tuttid-ts";
+import { absolutizeWorkspaceAppLaunchUrlWithSharedResolver } from "../workspaceAppLaunchUrl.ts";
 import type {
   WorkspaceAppFactoryJob,
   WorkspaceAppFactoryJobStatus,
@@ -368,7 +369,10 @@ export function normalizeWorkspaceAppCenterApp(
     stateRevision: app.stateRevision,
     tags: app.tags ?? [],
     updateAvailable: app.updateAvailable ?? false,
-    launchUrl: app.status === "running" ? app.launchUrl : null,
+    launchUrl:
+      app.status === "running"
+        ? absolutizeWorkspaceAppLaunchUrlWithSharedResolver(app.launchUrl)
+        : null,
     version: app.version,
     windowMinHeight: normalizeWorkspaceAppWindowMinimum(app.windowMinHeight),
     windowMinWidth: normalizeWorkspaceAppWindowMinimum(app.windowMinWidth)

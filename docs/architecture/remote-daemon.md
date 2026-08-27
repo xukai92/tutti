@@ -25,10 +25,16 @@ pnpm build:go   # or: cd services/tuttid && go build -o tuttid .
 
 TUTTID_ADDR=127.0.0.1:4545 \
 TUTTID_ACCESS_TOKEN="$(openssl rand -base64 32)" \
+TUTTID_APP_PROXY_ENABLED=1 \
 ./tuttid
 ```
 
 `TUTTID_ADDR` defaults to `127.0.0.1:4545`. `TUTTID_ACCESS_TOKEN` is required.
+
+`TUTTID_APP_PROXY_ENABLED=1` is required in remote mode so the daemon advertises
+its apps through a reverse proxy (see "App reverse proxy" below) instead of the
+raw `http://127.0.0.1:<port>` loopback URLs, which are unreachable from the
+client machine.
 
 > **Security.** The access token is sent as an HTTP bearer header and, for
 > WebSocket streams, as an `access_token` query parameter. Never expose the
@@ -51,10 +57,10 @@ remotely.
 
 Set two environment variables before launching the desktop app:
 
-| Variable | Meaning |
-| --- | --- |
-| `TUTTID_REMOTE_URL` | Base URL of the remote daemon. A bare `host:port` defaults to `https`. |
-| `TUTTID_REMOTE_ACCESS_TOKEN` | Must match the remote daemon's `TUTTID_ACCESS_TOKEN`. |
+| Variable                     | Meaning                                                                |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `TUTTID_REMOTE_URL`          | Base URL of the remote daemon. A bare `host:port` defaults to `https`. |
+| `TUTTID_REMOTE_ACCESS_TOKEN` | Must match the remote daemon's `TUTTID_ACCESS_TOKEN`.                  |
 
 Examples:
 
@@ -73,6 +79,31 @@ pnpm dev:desktop
 When `TUTTID_REMOTE_URL` is set the desktop does **not** start a local daemon.
 Startup blocks until the remote reports healthy, so a wrong URL/token surfaces
 immediately rather than as a later connection failure.
+
+## App reverse proxy
+
+Tutti apps (image gen, design, docs, …) run as small HTTP servers the daemon
+spawns on random loopback ports. Their launch URL is normally an absolute
+`http://127.0.0.1:<port>`, which points at the _client's_ localhost when the
+daemon is remote — so apps render blank.
+
+With `TUTTID_APP_PROXY_ENABLED=1` the daemon instead advertises each app as a
+daemon-relative path:
+
+```
+/v1/workspaces/{workspaceId}/apps/{appId}/proxy/
+```
+
+The desktop resolves that against the daemon base URL and loads it in the app
+webview. The daemon reverse-proxies those requests to the app's loopback port
+(`services/tuttid/api/daemon_app_proxy.go`), so:
+
+- app ports stay loopback-only on the daemon (never exposed on the network);
+- app traffic reuses the same tunnel and bearer auth as the rest of the daemon
+  API — the desktop injects the daemon token on the app webview's requests
+  (`resolveDaemonAppProxyAuthHeader` + the app session's `onBeforeSendHeaders`).
+
+No per-app port forwarding is needed.
 
 ## Caveats
 

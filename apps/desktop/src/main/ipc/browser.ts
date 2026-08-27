@@ -82,6 +82,14 @@ export async function registerBrowserIpc(
       workspaceId: string;
     }): Promise<void>;
     ensureUserBrowserHost(input: { workspaceId: string }): Promise<void>;
+    /**
+     * Attaches the daemon bearer token to requests that a workspace-app webview
+     * makes to the daemon's app reverse-proxy endpoint. Required in remote mode,
+     * where an app is loaded via /v1/workspaces/.../apps/.../proxy/ (which the
+     * daemon guards with bearer auth) instead of a direct loopback URL. Returns
+     * the header value for a matching request URL, or null to leave it alone.
+     */
+    resolveDaemonProxyAuthHeader?: (requestUrl: string) => string | null;
   }
 ): Promise<{ dispose(): void }> {
   const logger = getDesktopLogger();
@@ -122,6 +130,7 @@ export async function registerBrowserIpc(
     selectTarget: automationCoordinator.selectTarget
   });
   const preparedDownloadSessions = new WeakSet<Electron.Session>();
+  const preparedProxyAuthSessions = new WeakSet<Electron.Session>();
   let lastBrowserDownloadDirectory = app.getPath("downloads");
   let lastCookieImportDirectory = app.getPath("downloads");
   const chromeCookieImport = createMacosChromeCookieImportAdapter({
@@ -205,6 +214,26 @@ export async function registerBrowserIpc(
       if (!preparedDownloadSessions.has(browserSession)) {
         browserSession.setDownloadPath(app.getPath("downloads"));
         preparedDownloadSessions.add(browserSession);
+      }
+      const resolveDaemonProxyAuthHeader = options.resolveDaemonProxyAuthHeader;
+      if (
+        resolveDaemonProxyAuthHeader &&
+        !preparedProxyAuthSessions.has(browserSession)
+      ) {
+        preparedProxyAuthSessions.add(browserSession);
+        browserSession.webRequest.onBeforeSendHeaders((details, callback) => {
+          const authHeader = resolveDaemonProxyAuthHeader(details.url);
+          if (authHeader) {
+            callback({
+              requestHeaders: {
+                ...details.requestHeaders,
+                Authorization: authHeader
+              }
+            });
+            return;
+          }
+          callback({ requestHeaders: details.requestHeaders });
+        });
       }
     },
     registerHandler(channel, handler) {

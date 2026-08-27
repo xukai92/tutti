@@ -10,6 +10,10 @@ import type {
 } from "@preload/types";
 import type { IReporterService } from "../../analytics/services/reporterService.interface.ts";
 import { createDesktopWorkspaceAppCenterGateway } from "./internal/adapters/desktopWorkspaceAppCenterGateway.ts";
+import {
+  configureDaemonBaseUrlResolver,
+  createDaemonBaseUrlCache
+} from "./internal/workspaceAppLaunchUrl.ts";
 import { WorkspaceAppCenterService } from "./internal/workspaceAppCenterService.ts";
 import { WorkspaceAppSurfaceHost } from "./internal/workspaceAppSurfaceHost.ts";
 import {
@@ -32,13 +36,19 @@ export interface WorkspaceAppCenterServiceRegistrationInput {
   hostWorkspaceApi: Pick<DesktopHostWorkspaceApi, "openWorkspaceAppFolder">;
   tuttidClient: TuttidClient;
   reporterService?: Pick<IReporterService, "trackEvents">;
-  runtimeApi: Pick<DesktopRuntimeApi, "logRendererDiagnostic">;
+  runtimeApi: Pick<DesktopRuntimeApi, "logRendererDiagnostic"> &
+    Partial<Pick<DesktopRuntimeApi, "getBackendConfig">>;
 }
 
 export function registerWorkspaceAppCenterServices(
   registry: ServiceRegistry,
   input: WorkspaceAppCenterServiceRegistrationInput
 ): WorkspaceAppCenterServiceInterface {
+  const getBackendConfig = input.runtimeApi.getBackendConfig;
+  if (getBackendConfig) {
+    const baseUrlCache = createDaemonBaseUrlCache(() => getBackendConfig());
+    configureDaemonBaseUrlResolver(baseUrlCache.resolve);
+  }
   const surfaceHost = new WorkspaceAppSurfaceHost();
   const service = new WorkspaceAppCenterService({
     eventStreamClient: input.eventStreamClient,
