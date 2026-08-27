@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { resolveDesktopDefaultsFromEnv } from "../defaults.ts";
+import { resolveRemoteDaemonConfig } from "./remoteMode.ts";
 
 export interface DesktopDaemonEndpoint {
   accessToken: string;
@@ -18,6 +19,22 @@ export interface DesktopTerminalStreamUrlInput {
 
 export function resolveDesktopDaemonEndpoint(): DesktopDaemonEndpoint {
   const defaults = resolveDesktopDefaultsFromEnv();
+
+  // Remote mode: the daemon lives on another machine. Pre-bind the endpoint to
+  // the remote base URL and use the shared access token so every HTTP/WS request
+  // is routed there. No local process is spawned or discovered, so the listener
+  // info / PID paths are irrelevant but kept populated for logging shape.
+  const remote = resolveRemoteDaemonConfig();
+  if (remote) {
+    return {
+      accessToken: remote.accessToken,
+      boundAddr: remote.baseUrl,
+      listenerInfoPath: defaults.state.tuttidListenerInfoPath,
+      pidPath: defaults.state.tuttidPIDPath,
+      requestedAddr: remote.baseUrl
+    };
+  }
+
   const requestedAddr = process.env.TUTTID_ADDR?.trim() || "127.0.0.1:0";
 
   return {

@@ -30,6 +30,7 @@ import {
   type DesktopDaemonEndpoint
 } from "../transport/paths.ts";
 import { applyUserShellProxyToSession } from "../net/sessionProxy.ts";
+import { isRemoteDaemonModeEnabled } from "../transport/remoteMode.ts";
 import { resolveCachedUserShellEnv } from "./userShellEnv.ts";
 import {
   createDaemonRestartController,
@@ -83,12 +84,50 @@ export function createTuttidManager(
     workspaceAppCliPath?: string;
   }
 ): TuttidManager {
+  // In remote mode the daemon runs on another machine; there is nothing to spawn
+  // or supervise locally. We only wait for the remote to become reachable.
+  if (isRemoteDaemonModeEnabled()) {
+    return new RemoteTuttid(endpoint, tuttidClient);
+  }
+
   return new ManagedTuttid(
     endpoint,
     tuttidClient,
     options?.desktopUpdateAdmission,
     options?.workspaceAppCliPath
   );
+}
+
+// RemoteTuttid supervises nothing: it treats a pre-configured remote daemon as
+// an external dependency. start() blocks until the remote reports healthy (so
+// startup fails loudly if the remote is unreachable or the token is wrong),
+// stop() is a no-op, and health checks delegate to the shared client.
+class RemoteTuttid implements TuttidManager {
+  private readonly endpoint: DesktopDaemonEndpoint;
+  private readonly tuttidClient: TuttidClient;
+
+  constructor(endpoint: DesktopDaemonEndpoint, tuttidClient: TuttidClient) {
+    this.endpoint = endpoint;
+    this.tuttidClient = tuttidClient;
+  }
+
+  getHealth(): Promise<HealthStatusResponse> {
+    return this.tuttidClient.getHealth();
+  }
+
+  async start(): Promise<void> {
+    getDesktopLogger().info("connecting to remote tuttid", {
+      base_url: this.endpoint.boundAddr ?? this.endpoint.requestedAddr
+    });
+    await waitUntilHealthy(this.tuttidClient);
+    getDesktopLogger().info("remote tuttid healthy", {
+      base_url: this.endpoint.boundAddr ?? this.endpoint.requestedAddr
+    });
+  }
+
+  stop(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 class ManagedTuttid implements TuttidManager {
