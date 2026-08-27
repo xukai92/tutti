@@ -136,6 +136,71 @@ func TestProxyWorkspaceAppByRefererForwardsRootPath(t *testing.T) {
 	}
 }
 
+func TestProxyWorkspaceAppSetsRouteCookie(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	defer upstream.Close()
+
+	launchURL := upstream.URL
+	api := DaemonAPI{AppCenterService: proxyListAppCenterService{
+		apps: []workspacebiz.WorkspaceApp{{
+			Package: workspacebiz.AppPackage{AppID: "app-1"},
+			Runtime: workspacebiz.AppRuntimeState{
+				Status:    workspacebiz.AppRuntimeStatusRunning,
+				LaunchURL: &launchURL,
+			},
+		}},
+	}}
+
+	rec := httptest.NewRecorder()
+	api.ProxyWorkspaceApp(rec, newProxyRequest(t, "/v1/workspaces/ws-1/apps/app-1/proxy/"))
+
+	var routeCookie *http.Cookie
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == appProxyRouteCookie {
+			routeCookie = c
+		}
+	}
+	if routeCookie == nil {
+		t.Fatalf("expected %s cookie to be set", appProxyRouteCookie)
+	}
+	ws, app, ok := decodeAppRouteCookie(routeCookie.Value)
+	if !ok || ws != "ws-1" || app != "app-1" {
+		t.Fatalf("decodeAppRouteCookie(%q) = (%q,%q,%v)", routeCookie.Value, ws, app, ok)
+	}
+}
+
+func TestProxyWorkspaceAppByRefererRoutesViaCookieWithoutReferer(t *testing.T) {
+	var gotPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+	}))
+	defer upstream.Close()
+
+	launchURL := upstream.URL
+	api := DaemonAPI{AppCenterService: proxyListAppCenterService{
+		apps: []workspacebiz.WorkspaceApp{{
+			Package: workspacebiz.AppPackage{AppID: "app-1"},
+			Runtime: workspacebiz.AppRuntimeState{
+				Status:    workspacebiz.AppRuntimeStatusRunning,
+				LaunchURL: &launchURL,
+			},
+		}},
+	}}
+
+	rec := httptest.NewRecorder()
+	// No Referer — only the route cookie. This is the CSS/asset failure mode.
+	req := httptest.NewRequest(http.MethodGet, "/assets/index-abc.css", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  appProxyRouteCookie,
+		Value: encodeAppRouteCookie("ws-1", "app-1"),
+	})
+	api.ProxyWorkspaceAppByReferer(rec, req)
+
+	if gotPath != "/assets/index-abc.css" {
+		t.Fatalf("expected cookie-routed path, got %q", gotPath)
+	}
+}
+
 func TestProxyWorkspaceAppByRefererWithoutProxyRefererIs404(t *testing.T) {
 	api := DaemonAPI{AppCenterService: proxyListAppCenterService{}}
 	rec := httptest.NewRecorder()

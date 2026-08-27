@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -25,6 +26,37 @@ const AppProxyPathSegment = "proxy"
 var appProxyPrefixPattern = regexp.MustCompile(
 	`/v1/workspaces/([^/]+)/apps/([^/]+)/` + AppProxyPathSegment + `(?:/|$)`,
 )
+
+// appProxyRouteCookie carries the base64url-encoded "<workspaceID>.<appID>" so
+// the daemon can route
+// an app's root-absolute requests (assets, /api/*, WebSocket handshakes) back to
+// the right app even when the browser sends no usable Referer. It is set on the
+// proxied document response and, because each app webview has its own isolated
+// session partition (persist:tutti-app:<ws>:<app>), never collides across apps.
+const appProxyRouteCookie = "tutti_app_route"
+
+func encodeAppRouteCookie(workspaceID string, appID string) string {
+	// base64url is cookie-safe and never emits the "." separator, so parts with
+	// arbitrary bytes round-trip cleanly.
+	return base64.RawURLEncoding.EncodeToString([]byte(workspaceID)) + "." +
+		base64.RawURLEncoding.EncodeToString([]byte(appID))
+}
+
+func decodeAppRouteCookie(value string) (string, string, bool) {
+	parts := strings.SplitN(strings.TrimSpace(value), ".", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	workspaceID, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return "", "", false
+	}
+	appID, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil || len(workspaceID) == 0 || len(appID) == 0 {
+		return "", "", false
+	}
+	return string(workspaceID), string(appID), true
+}
 
 // appProxyPrefix builds the path prefix that ProxyWorkspaceApp serves and strips
 // before forwarding to the app.
@@ -65,6 +97,15 @@ func (api DaemonAPI) ProxyWorkspaceApp(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+	// Pin this app-webview session to the app so its root-absolute requests
+	// (assets, /api/*, WebSocket) route back here without depending on Referer.
+	http.SetCookie(w, &http.Cookie{
+		Name:     appProxyRouteCookie,
+		Value:    encodeAppRouteCookie(workspaceID, appID),
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 	api.proxyToApp(w, r, workspaceID, appID, appProxyPrefix(workspaceID, appID))
 }
 
@@ -80,7 +121,10 @@ func (api DaemonAPI) ProxyWorkspaceApp(w http.ResponseWriter, r *http.Request) {
 // recoverable app-proxy Referer are passed to the fallback handler, so genuine
 // unknown routes still 404 normally.
 func (api DaemonAPI) ProxyWorkspaceAppByReferer(w http.ResponseWriter, r *http.Request) {
-	workspaceID, appID, ok := appIdentityFromReferer(r.Header.Get("Referer"))
+	// Prefer the route cookie (reliable: sent on every same-origin request), and
+	// fall back to the Referer for the very first requests before the cookie from
+	// the document response has been stored.
+	workspaceID, appID, ok := appIdentityFromRoutedRequest(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -88,6 +132,15 @@ func (api DaemonAPI) ProxyWorkspaceAppByReferer(w http.ResponseWriter, r *http.R
 	// No prefix to strip: the app asked for a root-absolute path and expects it
 	// verbatim.
 	api.proxyToApp(w, r, workspaceID, appID, "")
+}
+
+func appIdentityFromRoutedRequest(r *http.Request) (string, string, bool) {
+	if cookie, err := r.Cookie(appProxyRouteCookie); err == nil {
+		if workspaceID, appID, ok := decodeAppRouteCookie(cookie.Value); ok {
+			return workspaceID, appID, true
+		}
+	}
+	return appIdentityFromReferer(r.Header.Get("Referer"))
 }
 
 func appIdentityFromReferer(referer string) (string, string, bool) {
