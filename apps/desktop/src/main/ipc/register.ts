@@ -79,8 +79,12 @@ export async function registerIpcHandlers(
       }),
     ensureUserBrowserHost: ({ workspaceId }) =>
       deps.workspaceLaunch.ensureUserBrowserHost(workspaceId),
-    resolveDaemonProxyAuthHeader: (requestUrl) =>
-      resolveDaemonAppProxyAuthHeader(deps.daemonEndpoint, requestUrl)
+    resolveDaemonProxyAuthHeader: (requestUrl, refererUrl) =>
+      resolveDaemonAppProxyAuthHeader(
+        deps.daemonEndpoint,
+        requestUrl,
+        refererUrl
+      )
   });
   registerComputerUseIpc();
   registerDockPreviewCacheIpc();

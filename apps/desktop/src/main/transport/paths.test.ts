@@ -61,3 +61,36 @@ test("resolveDaemonAppProxyAuthHeader returns null before the endpoint is bound"
 test("resolveDaemonAppProxyAuthHeader tolerates malformed request urls", () => {
   assert.equal(resolveDaemonAppProxyAuthHeader(endpoint(), "not a url"), null);
 });
+
+test("resolveDaemonAppProxyAuthHeader attaches bearer for a root asset with a proxy referer", () => {
+  assert.equal(
+    resolveDaemonAppProxyAuthHeader(
+      endpoint(),
+      "http://127.0.0.1:4545/assets/index-abc.js",
+      "http://127.0.0.1:4545/v1/workspaces/ws-1/apps/app-1/proxy/"
+    ),
+    "Bearer secret-token"
+  );
+});
+
+test("resolveDaemonAppProxyAuthHeader ignores a root asset with a non-proxy referer", () => {
+  assert.equal(
+    resolveDaemonAppProxyAuthHeader(
+      endpoint(),
+      "http://127.0.0.1:4545/assets/index-abc.js",
+      "http://127.0.0.1:4545/some/other/page"
+    ),
+    null
+  );
+});
+
+test("resolveDaemonAppProxyAuthHeader ignores a cross-origin proxy referer", () => {
+  assert.equal(
+    resolveDaemonAppProxyAuthHeader(
+      endpoint(),
+      "http://127.0.0.1:4545/assets/index-abc.js",
+      "http://evil.example/v1/workspaces/ws-1/apps/app-1/proxy/"
+    ),
+    null
+  );
+});

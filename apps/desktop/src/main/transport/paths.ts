@@ -46,16 +46,25 @@ export function resolveDesktopDaemonEndpoint(): DesktopDaemonEndpoint {
   };
 }
 
+const appProxyPathPattern = /\/v1\/workspaces\/[^/]+\/apps\/[^/]+\/proxy(\/|$)/;
+
 /**
  * Returns the `Authorization` header value to attach to a workspace-app webview
- * request when (and only when) it targets the daemon's app reverse-proxy
- * endpoint, so the daemon's bearer auth is satisfied. Returns null for any other
- * request (app's own assets, cross-origin calls) so unrelated traffic is
- * untouched. Safe to call before the endpoint is bound (returns null).
+ * request destined for the daemon, so the daemon's bearer auth is satisfied.
+ *
+ * A request qualifies when it targets the daemon origin AND either:
+ *  - its own path is an app-proxy path (the initial document load), or
+ *  - its Referer is an app-proxy page (root-absolute asset/API requests the app
+ *    makes, e.g. "/assets/x.js" or a runtime fetch("/api/..."), which the daemon
+ *    routes back to the app by Referer).
+ *
+ * Returns null for anything else so unrelated traffic is untouched. Safe to call
+ * before the endpoint is bound (returns null).
  */
 export function resolveDaemonAppProxyAuthHeader(
   endpoint: DesktopDaemonEndpoint,
-  requestUrl: string
+  requestUrl: string,
+  refererUrl?: string
 ): string | null {
   if (!endpoint.boundAddr || !endpoint.accessToken) {
     return null;
@@ -71,12 +80,31 @@ export function resolveDaemonAppProxyAuthHeader(
   if (target.origin !== base.origin) {
     return null;
   }
-  if (
-    !/\/v1\/workspaces\/[^/]+\/apps\/[^/]+\/proxy(\/|$)/.test(target.pathname)
-  ) {
+  const targetIsProxyPath = appProxyPathPattern.test(target.pathname);
+  const refererIsProxyPage = isAppProxyReferer(refererUrl, base.origin);
+  if (!targetIsProxyPath && !refererIsProxyPage) {
     return null;
   }
   return `Bearer ${endpoint.accessToken}`;
+}
+
+function isAppProxyReferer(
+  refererUrl: string | undefined,
+  daemonOrigin: string
+): boolean {
+  const trimmed = refererUrl?.trim() ?? "";
+  if (trimmed === "") {
+    return false;
+  }
+  try {
+    const referer = new URL(trimmed);
+    return (
+      referer.origin === daemonOrigin &&
+      appProxyPathPattern.test(referer.pathname)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function resolveDesktopDaemonBaseUrl(

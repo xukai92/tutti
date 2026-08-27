@@ -22,6 +22,7 @@ type Routes interface {
 	HandleManagedModelProviderTest(http.ResponseWriter, *http.Request, string, string)
 	HandleManagedModelProviders(http.ResponseWriter, *http.Request, string)
 	ProxyWorkspaceApp(http.ResponseWriter, *http.Request)
+	ProxyWorkspaceAppByReferer(http.ResponseWriter, *http.Request)
 }
 
 func RegisterRoutes(mux *http.ServeMux, routes Routes) {
@@ -523,6 +524,13 @@ func RegisterRoutes(mux *http.ServeMux, routes Routes) {
 	)
 
 	registerWorkspaceAppRoutes(mux, wrapper)
+
+	// Root fallback: apps built to be served from the origin root request their
+	// assets and APIs at root-absolute paths (e.g. "/assets/x.js") that carry no
+	// app-proxy prefix. Recover the originating app from the Referer and forward
+	// to it. Longest-prefix matching means this only catches paths no real route
+	// claims; a request with no app-proxy Referer 404s as before.
+	mux.HandleFunc("/", routes.ProxyWorkspaceAppByReferer)
 
 	mux.HandleFunc("/v1/workspaces/{workspaceID}/app-factory/jobs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
